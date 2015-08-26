@@ -2,10 +2,10 @@
 Enable load balancing, high availability and data mobility for your Docker containers http://www.convergeio.com
 
 
-### Plugin for ClusterHQ/flocker
-This is a plugin driver for the flocker project which enables Docker containers and data to move together between hosts in a cluster. Providing data persistence and high availability is critical for stateful services like databases running in containers. 
+### Plugin for ClusterHQ/Flocker
+This is a plugin driver for the [Flocker](https://github.com/ClusterHQ/flocker) project which enables Docker containers and data to move together between hosts in a cluster. Providing data persistence and high availability is critical for stateful services like databases running in containers. 
 
-This driver combines with flocker to fully automate the movement of the container and data volume, making it easy to support stateful services using Docker containers. It also enables ConvergeIO's software to work as a storage backend for flocker. The virtual SAN approach of ConvergeIO's software eliminates physical data copying when a data volume is moved with its container. This capability enables the flocker orchestrated movement of container and data volume to happen  instantaneously. In addition, network I/O to copy data and CPU resources to manage the transfer are greatly reduced which limits any impact to the performance of containerized applications. 
+This driver combines with Flocker to fully automate the movement of the container and data volume, making it easy to support stateful services using Docker containers. It also enables [ConvergeIO](http://www.convergeio.com)'s software to work as a storage backend for flocker. The virtual SAN approach of ConvergeIO's software eliminates physical data copying when a data volume is moved with its container. This capability enables the flocker orchestrated movement of container and data volume to happen  instantaneously. In addition, network I/O to copy data and CPU resources to manage the transfer are greatly reduced which limits any impact to the performance of containerized applications. 
 
 ### About Us
 We're a small team of engineers with experience in enterprise storage systems. We see a need for open source software to deliver high performance, enterprise class, software defined storage for hyper-converged systems. 
