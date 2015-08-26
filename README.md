@@ -1,5 +1,5 @@
 # cio-flocker-driver
-Enable load balancing, high availability and data mobility for your Docker contaniners http://www.convergeio.com
+Enable load balancing, high availability and data mobility for your Docker containers http://www.convergeio.com
 
 
 ### Plugin for ClusterHQ/flocker
