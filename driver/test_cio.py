@@ -6,7 +6,7 @@ from flocker.node.agents.test.test_blockdevice import (
             make_iblockdeviceapi_tests
             )
 
-class HedvigBlockDeviceAPIInterfaceTests(
+class CIOBlockDeviceAPIInterfaceTests(
         make_iblockdeviceapi_tests(
             blockdevice_api_factory=(
                 blockdevice_api_factory=(
