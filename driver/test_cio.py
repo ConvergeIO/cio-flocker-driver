@@ -9,12 +9,11 @@ from flocker.node.agents.test.test_blockdevice import (
 class CIOBlockDeviceAPIInterfaceTests(
         make_iblockdeviceapi_tests(
             blockdevice_api_factory=(
-                blockdevice_api_factory=(
-                    lambda test_case: test_case
-                ),
-                minimum_allocatable_size=int(GiB(8).to_Byte().value),
-                device_allocation_unit=int(GiB(8).to_Byte().value),
-                unknown_blockdevice_id_factory=lambda test: unicode(uuid4())
+                lambda test_case: test_case
+            ),
+            minimum_allocatable_size=int(GiB(8).to_Byte().value),
+            device_allocation_unit=int(GiB(8).to_Byte().value),
+            unknown_blockdevice_id_factory=lambda test: unicode(uuid4())
             )
         ):
         """
