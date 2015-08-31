@@ -87,12 +87,11 @@ def _blockdevicevolume_from_cio_volume(vdisk_number):
 
     :return: Input volume in BlockDeviceVolume format.
     """
-    command = [b"/usr/bin/cio", b"vdinfo" b"-v", vdisk_number]
+    command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(vdisk_number)]
     vdisk_uuid_line = check_output(command).split(b'\n')[1]
-    vdisk_uuid = vdisk_uuid_line.split(b' ')[1]
+    vdisk_uuid = vdisk_uuid_line.split()[1]
     capacity_line = check_output(command).split(b'\n')[5]
-    capacity = vdisk_uuid_line.split(b' ')[1]
-    import pdb; pdb.set_trace()
+    capacity = capacity_line.split()[1]
 
     return BlockDeviceVolume(
         blockdevice_id=unicode(vdisk_uuid),
@@ -199,7 +198,9 @@ class CIOBlockDeviceAPI(object):
 
         # TODO: please parameterize redundancy (default of 2), min IOPS,
         # max IOPS, device type (``ssd`` or ``hdd``).
-        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size]
+        size = bytes(int(Byte(size).to_GiB().value))
+        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size, b"-q"]
+        
         command_output = check_output(create_command).split(b'\n')[0]
         device_number = int(command_output.strip().decode("ascii"))
 
