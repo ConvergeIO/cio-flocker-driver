@@ -9,6 +9,7 @@ import logging
 from uuid import UUID
 
 from bitmath import Byte, GiB
+from boto.utils import get_instance_metadata
 
 from pyrsistent import PRecord, field, pset, pmap
 from zope.interface import implementer
@@ -16,11 +17,10 @@ from twisted.python.filepath import FilePath
 
 from eliot import Message
 
-from .blockdevice import (
+from flocker.node.agents.blockdevice import (
     IBlockDeviceAPI, BlockDeviceVolume, UnknownVolume, AlreadyAttachedVolume,
     UnattachedVolume,
 )
-from ...control import pmap_field
 
 DATASET_ID_LABEL = u'flocker-dataset-id'
 METADATA_VERSION_LABEL = u'flocker-metadata-version'
@@ -137,7 +137,7 @@ class CIOBlockDeviceAPI(object):
         Return a fixed allocation_unit for now; one which we observe
         to work on AWS.
         """
-        return int(GiB(1).to_Byte().value)
+        return int(GiB(8).to_Byte().value)
 
     def compute_instance_id(self):
         """
@@ -159,13 +159,11 @@ class CIOBlockDeviceAPI(object):
         :raise UnknownVolume: If no volume with a matching identifier can be
              found.
         """
-        try:
-            # TODO: please replace below with CIO command line
-            # all_volumes = self.connection.get_all_volumes(
-            #    volume_ids=[blockdevice_id])
-            # END TODO
-        except:
-            # TODO: please generate UnknownVolume exception
+        # TODO: please replace below with CIO command line
+        # all_volumes = self.connection.get_all_volumes(
+        #    volume_ids=[blockdevice_id])
+        # TODO: please generate UnknownVolume exception
+        # END TODO
 
         for volume in all_volumes:
             if volume.id == blockdevice_id:
@@ -184,6 +182,19 @@ class CIOBlockDeviceAPI(object):
         #    size=int(Byte(size).to_GiB().value), zone=self.zone)
         # END TODO
 
+        # Sample create command:
+        # 'cio vdadd –c 25 –l 2 –t ssd –i 1000 2000 '
+        # Create vdisk of size 25 GB, redundancy 2, of type SSD,
+        # min IOPS 1000, max IOPS 2000.
+
+        # TODO: please parameterize hardcoded redundancy, min IOPS,
+        # max IOPS.
+        redundancy = 2
+        min_iops = 1000
+        max_iops = 2000
+        command = [b"/usr/bin/cio", b"-c", size, b"-l", 2b"--bytes",
+               b"--output", b"SIZE", device_name]
+
         # Stamp created volume with Flocker-specific tags.
         metadata = {
             METADATA_VERSION_LABEL: '1',
@@ -197,7 +208,7 @@ class CIOBlockDeviceAPI(object):
         # END TODO
 
         # Return created volume in BlockDeviceVolume format.
-        return _blockdevicevolume_from_ebs_volume(requested_volume)
+        return _blockdevicevolume_from_cio_volume(requested_volume)
 
     def list_volumes(self):
         """
@@ -209,7 +220,7 @@ class CIOBlockDeviceAPI(object):
         # END TODO
         if _is_cluster_volume(self.cluster_id, cio_volume):
             volumes.append(
-                _blockdevicevolume_from_ebs_volume(cio_volume)
+                _blockdevicevolume_from_cio_volume(cio_volume)
             )
         return volumes
 
