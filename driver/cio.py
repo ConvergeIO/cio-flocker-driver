@@ -78,7 +78,7 @@ def cio_client(region, zone, access_key_id, secret_access_key):
     return
 
 
-def _blockdevicevolume_from_cio_volume(cio_volume):
+def _blockdevicevolume_from_cio_volume(vdisk_number):
     """
     Helper function to convert Volume information from
     CIO format to Flocker block device format.
@@ -87,12 +87,23 @@ def _blockdevicevolume_from_cio_volume(cio_volume):
 
     :return: Input volume in BlockDeviceVolume format.
     """
+    command = [b"/usr/bin/cio", b"vdinfo" b"-v", vdisk_number]
+    vdisk_uuid_line = check_output(command).split(b'\n')[1]
+    vdisk_uuid = vdisk_uuid_line.split(b' ')[1]
+    capacity_line = check_output(command).split(b'\n')[5]
+    capacity = vdisk_uuid_line.split(b' ')[1]
+    import pdb; pdb.set_trace()
+
     return BlockDeviceVolume(
-        blockdevice_id=unicode(cio_volume.id),
-        size=int(GiB(ebs_volume.size).to_Byte().value),
-        attached_to=cio_volume.attach_data.instance_id,
-        dataset_id=UUID(cio_volume.tags[DATASET_ID_LABEL])
-    )
+        blockdevice_id=unicode(vdisk_uuid),
+        size=int(GiB(capacity).to_Byte().value),
+        attached_to='',
+        dataset_id='')
+        # TODO: please figure out ``attached_to`` and ``dataset_id`` from
+        # metadata.
+        # END TODO
+        # attached_to=cio_volume.attach_data.instance_id,
+        # dataset_id=UUID(cio_volume.tags[DATASET_ID_LABEL]
 
 
 def _is_cluster_volume(cluster_id, cio_volume):
@@ -181,19 +192,16 @@ class CIOBlockDeviceAPI(object):
         # requested_volume = self.connection.create_volume(
         #    size=int(Byte(size).to_GiB().value), zone=self.zone)
         # END TODO
-
         # Sample create command:
-        # 'cio vdadd –c 25 –l 2 –t ssd –i 1000 2000 '
-        # Create vdisk of size 25 GB, redundancy 2, of type SSD,
+        # cio vdadd -c 25 -l 2 -t ssd -i 1000 2000
+        # Creates vdisk of size 25 GB, redundancy 2, of type SSD,
         # min IOPS 1000, max IOPS 2000.
 
-        # TODO: please parameterize hardcoded redundancy, min IOPS,
-        # max IOPS.
-        redundancy = 2
-        min_iops = 1000
-        max_iops = 2000
-        command = [b"/usr/bin/cio", b"-c", size, b"-l", 2b"--bytes",
-               b"--output", b"SIZE", device_name]
+        # TODO: please parameterize redundancy (default of 2), min IOPS,
+        # max IOPS, device type (``ssd`` or ``hdd``).
+        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size]
+        command_output = check_output(create_command).split(b'\n')[0]
+        device_number = int(command_output.strip().decode("ascii"))
 
         # Stamp created volume with Flocker-specific tags.
         metadata = {
@@ -208,7 +216,7 @@ class CIOBlockDeviceAPI(object):
         # END TODO
 
         # Return created volume in BlockDeviceVolume format.
-        return _blockdevicevolume_from_cio_volume(requested_volume)
+        return _blockdevicevolume_from_cio_volume(device_number)
 
     def list_volumes(self):
         """
