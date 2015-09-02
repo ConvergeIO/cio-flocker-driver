@@ -214,10 +214,10 @@ class CIOBlockDeviceAPI(object):
         # TODO: please parameterize redundancy (default of 2), min IOPS,
         # max IOPS, device type (``ssd`` or ``hdd``).
         size = bytes(int(Byte(size).to_GiB().value))
-        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size, b"-q"]
+        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size, b"-k", b"/dev/rdsk",b"-q"]
         command_output = check_output(create_command).split(b'\n')[0]
         device_number = int(command_output.strip().decode("ascii"))
-        add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", b"unattached", b"-v", bytes(device_number)]
+        add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", b"None", b"-v", bytes(device_number)]
         command_output = check_output(add_attach_metadata_command).split(b'\n')
         add_dataset_id_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-d", unicode(dataset_id), b"-v",bytes(device_number)]
         command_output = check_output(add_dataset_id_metadata_command).split(b'\n')
@@ -234,7 +234,7 @@ class CIOBlockDeviceAPI(object):
         # END TODO
 
         # Return created volume in BlockDeviceVolume format.
-        return _blockdevicevolume_from_cio_volume(device_number,datasetid=dataset_id,computeinstanceid="unattached".decode("ascii"))
+        return _blockdevicevolume_from_cio_volume(device_number,datasetid=dataset_id,computeinstanceid=None)
 
     def list_volumes(self):
         """
@@ -252,13 +252,16 @@ class CIOBlockDeviceAPI(object):
                device_number = int(alias.strip().decode("ascii").replace("vd",""))
                get_dataset_id_command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(device_number)]
                
-               dataset_id_command_output = check_output(get_dataset_id_command).split(b'\n')[18]
+               dataset_id_command_output = check_output(get_dataset_id_command).split(b'\n')[19]
                dataset_id = dataset_id_command_output.split()[3]
                get_compute_instance_id_command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(device_number)]
                get_compute_instance_id_command_output = check_output(get_compute_instance_id_command).split(b'\n')[4]
-               compute_instance_id = (get_compute_instance_id_command_output.split()[1])
+               compute_instance_id = (get_compute_instance_id_command_output.split()[1]).decode("ascii")
+               if compute_instance_id=="None":
+                  compute_instance_id=None
+               
         #if _is_cluster_volume(self.cluster_id, cio_volume):
-               volumes.append(_blockdevicevolume_from_cio_volume(device_number,datasetid=UUID(dataset_id),computeinstanceid=compute_instance_id.decode("ascii")))
+               volumes.append(_blockdevicevolume_from_cio_volume(device_number,datasetid=UUID(dataset_id),computeinstanceid=compute_instance_id))
         return volumes
 
     def attach_volume(self, blockdevice_id, attach_to):
@@ -282,12 +285,13 @@ class CIOBlockDeviceAPI(object):
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
         compute_output = check_output(command).split(b'\n')[4]
         compute_node_id = compute_output.split()[1]
-        if compute_node_id != "unattached":
+        if compute_node_id != "None":   
            raise AlreadyAttachedVolume(blockdevice_id)
-        add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", attach_to, b"-v", bytes(cio_volume)]
-        command_output = check_output(add_attach_metadata_command).split(b'\n')
+        if attach_to != None :
+           add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", attach_to, b"-v", bytes(cio_volume)]
+           command_output = check_output(add_attach_metadata_command).split(b'\n')
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
-        compute_output = check_output(command).split(b'\n')[18]
+        compute_output = check_output(command).split(b'\n')[19]
         dataset_id = (compute_output.split()[3])
         return _blockdevicevolume_from_cio_volume(bytes(cio_volume),datasetid=UUID(dataset_id),computeinstanceid=attach_to)
         
@@ -323,12 +327,12 @@ class CIOBlockDeviceAPI(object):
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
         compute_output = check_output(command).split(b'\n')[4]
         compute_node_id = compute_output.split()[1]
-        if compute_node_id == "unattached":
+        if compute_node_id == "None":
            raise UnattachedVolume(blockdevice_id)
-        add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", b"unattached", b"-v", bytes(cio_volume)]
+        add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", b"None", b"-v", bytes(cio_volume)]
         command_output = check_output(add_attach_metadata_command).split(b'\n')
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
-        compute_output = check_output(command).split(b'\n')[18]
+        compute_output = check_output(command).split(b'\n')[19]
         dataset_id = (compute_output.split()[3])
         return _blockdevicevolume_from_cio_volume(bytes(cio_volume),datasetid=UUID(dataset_id),computeinstanceid=None)
         
@@ -381,13 +385,10 @@ class CIOBlockDeviceAPI(object):
         cio_volume = self._get_cio_volume(blockdevice_id)
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
         compute_output = check_output(command).split(b'\n')[4]
-        compute_node_id = compute_output.split()[1]
-        if compute_node_id == "unattached":
+        attached_to = compute_output.split()[1]
+        if attached_to == "None":
            raise UnattachedVolume(blockdevice_id)
 
-        get_compute_instance_id_command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
-        get_compute_instance_id_command_output = check_output(get_compute_instance_id_command).split(b'\n')[4]
-        attached_to = (get_compute_instance_id_command_output.split()[1])
         compute_instance_id = self.compute_instance_id()
         if attached_to != compute_instance_id:
             # This is untested.  See FLOC-2453.
@@ -396,7 +397,7 @@ class CIOBlockDeviceAPI(object):
                     attached_to, compute_instance_id
                 )
             )
-        command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
-        compute_output = check_output(command).split(b'\n')[18]
-        dataset_id = (compute_output.split()[3])
-        return _blockdevicevolume_from_cio_volume(bytes(cio_volume),datasetid=UUID(dataset_id),computeinstanceid=attached_to.decode("ascii"))
+        #command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume), b"-k"]
+        #compute_output = check_output(command).split(b'\n')[0]
+        #device_path = (compute_output.split()[1])
+        return FilePath("/cio/vd" + str(cio_volume))

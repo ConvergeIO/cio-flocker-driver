@@ -12,7 +12,7 @@ def GetCioApiWithCleanup(test_case):
     cluster_id = uuid4()
     cioClient = CIOBlockDeviceAPI(cluster_id)
     # TODO: add cleanup of volumes created by the test.
-    # test_case.addCleanup(cioClient._cleanup)
+    test_case.addCleanup(cioClient._cleanup)
     # END TODO
     return cioClient
 
