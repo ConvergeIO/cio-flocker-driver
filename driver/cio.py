@@ -214,7 +214,7 @@ class CIOBlockDeviceAPI(object):
         # TODO: please parameterize redundancy (default of 2), min IOPS,
         # max IOPS, device type (``ssd`` or ``hdd``).
         size = bytes(int(Byte(size).to_GiB().value))
-        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size, b"-k", b"/dev/rdsk",b"-q"]
+        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size, b"-n", b"aws1",b"-k", b"/dev/rdsk",b"-q"]
         command_output = check_output(create_command).split(b'\n')[0]
         device_number = int(command_output.strip().decode("ascii"))
         add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-a", b"None", b"-v", bytes(device_number)]
@@ -323,7 +323,8 @@ class CIOBlockDeviceAPI(object):
         :raises UnattachedVolume: If the BlockDeviceVolume for the
             blockdevice_id is not currently in use.
         """
-        cio_volume = self._get_cio_volume(blockdevice_id)
+        print("detach_volume",blockdevice_id)
+	cio_volume = self._get_cio_volume(blockdevice_id)
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
         compute_output = check_output(command).split(b'\n')[4]
         compute_node_id = compute_output.split()[1]
@@ -382,6 +383,7 @@ class CIOBlockDeviceAPI(object):
         :raises UnattachedVolume: If the supplied ``blockdevice_id`` is
             not attached to a host.
         """
+	print("get_device_path",blockdevice_id)
         cio_volume = self._get_cio_volume(blockdevice_id)
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume)]
         compute_output = check_output(command).split(b'\n')[4]
@@ -400,4 +402,4 @@ class CIOBlockDeviceAPI(object):
         #command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume), b"-k"]
         #compute_output = check_output(command).split(b'\n')[0]
         #device_path = (compute_output.split()[1])
-        return FilePath("/cio/vd" + str(cio_volume))
+        return FilePath("/dev/vdisk/vd" + str(cio_volume))
