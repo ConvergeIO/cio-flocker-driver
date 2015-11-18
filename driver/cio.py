@@ -19,8 +19,7 @@ from twisted.python.filepath import FilePath
 from eliot import Message
 
 from flocker.node.agents.blockdevice import (
-    IBlockDeviceAPI, BlockDeviceVolume, UnknownVolume, AlreadyAttachedVolume,
-    UnattachedVolume,
+    IBlockDeviceAPI, IProfiledBlockDeviceAPI,BlockDeviceVolume, UnknownVolume, AlreadyAttachedVolume, UnattachedVolume,MandatoryProfiles
 )
 
 DATASET_ID_LABEL = u'flocker-dataset-id'
@@ -131,6 +130,7 @@ def _delete_cio_volume(blockdevice_id):
        del blockdevice_id_to_cio_volume_map[blockdevice_id]
 
 @implementer(IBlockDeviceAPI)
+@implementer(IProfiledBlockDeviceAPI)
 class CIOBlockDeviceAPI(object):
     """
     A CIO implementation of ``IBlockDeviceAPI`` which creates
@@ -233,6 +233,44 @@ class CIOBlockDeviceAPI(object):
 
         # Return created volume in BlockDeviceVolume format.
         return _blockdevicevolume_from_cio_volume(device_number,datasetid=dataset_id,computeinstanceid=None)
+
+    def create_volume_with_profile(self, dataset_id, size, profile_name):
+        """
+        Create a volume on CIO. Store Flocker-specific
+        {metadata version, cluster id, dataset id} for the volume
+        as volume tag data.
+        """
+        # TODO: please replace below with CIO callout.
+        # requested_volume = self.connection.create_volume(
+        #    size=int(Byte(size).to_GiB().value), zone=self.zone)
+        # END TODO
+        # Sample create command:
+        # cio vdadd -c 25 -l 2 -t ssd -i 1000 2000
+        # Creates vdisk of size 25 GB, redundancy 2, of type SSD,
+        # min IOPS 1000, max IOPS 2000.
+
+        # TODO: please parameterize redundancy (default of 2), min IOPS,
+        # max IOPS, device type (``ssd`` or ``hdd``).
+        size = bytes(int(Byte(size).to_GiB().value))
+        try :
+       	    create_command = [b"/usr/bin/cio", b"vdadd", b"-p", profile_name.upper(), b"-n", b"aws1",b"-q"]
+            command_output = check_output(create_command).split(b'\n')[0]
+            device_number = int(command_output.strip().decode("ascii"))
+            modify_size_command = [b"/usr/bin/cio", b"vdmod", b"-v", bytes(device_number),b"-c", size]
+            command_output = check_output(modify_size_command).split(b'\n')[0]
+            add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-v", bytes(device_number), b"--attachstatus","None"]
+            command_output = check_output(add_attach_metadata_command).split(b'\n')[0]
+            add_dataset_id_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-v",bytes(device_number), b"--datasetid",unicode(dataset_id)]
+            command_output = check_output(add_dataset_id_metadata_command).split(b'\n')[0]
+            # Stamp created volume with Flocker-specific tags.
+            metadata = {
+                METADATA_VERSION_LABEL: '1',
+                CLUSTER_ID_LABEL: unicode(self.cluster_id),
+                DATASET_ID_LABEL: unicode(dataset_id),
+            }
+        except Exception:
+            raise
+        # Return created volume in BlockDeviceVolume format.
 
     def list_volumes(self):
         """
