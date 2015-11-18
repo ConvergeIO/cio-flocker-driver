@@ -161,10 +161,9 @@ class CIOBlockDeviceAPI(object):
         """
         Look up the compute instance ID for this node.
         """
-        # TODO: Please update the compute node identifier below so
-        # so that CIO driver can work correctly on non-EC2 compute
-        # nodes.
-        return get_instance_metadata()['instance-id'].decode("ascii")
+        get_compute_instance_id_command = [b"sudo",b"/usr/bin/cio", b"nodeid"]
+        command_output = check_output(get_compute_instance_id_command).split(b'\n')[0]
+        return command_output.decode("ascii")
 
     def _get_cio_volume(self, blockdevice_id):
         """
@@ -212,7 +211,7 @@ class CIOBlockDeviceAPI(object):
         # TODO: please parameterize redundancy (default of 2), min IOPS,
         # max IOPS, device type (``ssd`` or ``hdd``).
         size = bytes(int(Byte(size).to_GiB().value))
-        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size, b"-n", b"aws1",b"-q"]
+        create_command = [b"/usr/bin/cio", b"vdadd", b"-c", size,b"-q"]
         command_output = check_output(create_command).split(b'\n')[0]
         device_number = int(command_output.strip().decode("ascii"))
         add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-v", bytes(device_number), b"--attachstatus","None"]
@@ -253,7 +252,7 @@ class CIOBlockDeviceAPI(object):
         # max IOPS, device type (``ssd`` or ``hdd``).
         size = bytes(int(Byte(size).to_GiB().value))
         try :
-       	    create_command = [b"/usr/bin/cio", b"vdadd", b"-p", profile_name.upper(), b"-n", b"aws1",b"-q"]
+       	    create_command = [b"/usr/bin/cio", b"vdadd", b"-p", profile_name.upper(), b"-q"]
             command_output = check_output(create_command).split(b'\n')[0]
             device_number = int(command_output.strip().decode("ascii"))
             modify_size_command = [b"/usr/bin/cio", b"vdmod", b"-v", bytes(device_number),b"-c", size]
@@ -322,16 +321,23 @@ class CIOBlockDeviceAPI(object):
         if cio_volume == "Fail:" :
             raise UnknownVolume(blockdevice_id)
         command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume),b"--attachstatus"]
-        compute_node_id = check_output(command).split(b'\n')[0]
-        if compute_node_id != "None":   
-           raise AlreadyAttachedVolume(blockdevice_id)
-        if attach_to != None :
-           add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-v", bytes(cio_volume), b"--attachstatus", attach_to]
-           command_output = check_output(add_attach_metadata_command).split(b'\n')
-           command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume), b"--datasetid"]
-           output = check_output(command).split(b'\n')[0]
-           dataset_id = output.split()[0].decode("ascii")
-           return _blockdevicevolume_from_cio_volume(bytes(cio_volume),datasetid=UUID(dataset_id),computeinstanceid=attach_to)
+        current_attachment = check_output(command).split(b'\n')[0]
+        if current_attachment != "None":   
+           #if current_attachment == attach_to:
+              raise AlreadyAttachedVolume(blockdevice_id)
+           #else : 
+           #   compute_instance_id = self.compute_instance_id()
+           #   if attach_to != compute_instance_id :
+           #      move_volume_command = [b"/usr/bin/cio", b"vdmv", b"-v", bytes(cio_volume), b"-N", attach_to]
+           #      command_output = check_output(move_volume_command).split(b'\n')
+        else :
+           if attach_to != None :
+              add_attach_metadata_command = [b"/usr/bin/cio", b"vdmod", b"-v", bytes(cio_volume), b"--attachstatus", attach_to]
+              command_output = check_output(add_attach_metadata_command).split(b'\n')
+        command = [b"/usr/bin/cio", b"vdinfo", b"-v", bytes(cio_volume), b"--datasetid"]
+        output = check_output(command).split(b'\n')[0]
+        dataset_id = output.split()[0].decode("ascii")
+        return _blockdevicevolume_from_cio_volume(bytes(cio_volume),datasetid=UUID(dataset_id),computeinstanceid=attach_to)
         
         # TODO: Please replace below with CIO commands to raise
         # AlreadyAttachedVolume exception.
